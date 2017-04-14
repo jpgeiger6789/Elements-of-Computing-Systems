@@ -1,0 +1,11 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/08/ProgramFlow/BasicLoop/BasicLoop.vm
+
+// Tests that different functions, stored in two different 
+// class files, manipulate the static segment correctly. 
+function Sys.init 0
+call BasicLoop.main 0
+label infiniteloop
+goto infiniteloop
