@@ -1,0 +1,11 @@
+
+CHIP First3From9 {
+    IN  
+        in[9];
+	OUT out[3];
+	
+    PARTS:
+   And(a=in[0], b=true, out=out[0]);
+   And(a=in[1], b=true, out=out[1]);
+   And(a=in[2], b=true, out=out[2]);
+}

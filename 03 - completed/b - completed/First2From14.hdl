@@ -1,0 +1,10 @@
+
+CHIP First2From14 {
+    IN  
+        in[14];
+	OUT out[2];
+	
+    PARTS:
+   And(a=in[0], b=true, out=out[0]);
+   And(a=in[1], b=true, out=out[1]);
+}
