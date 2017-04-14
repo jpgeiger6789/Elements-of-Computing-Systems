@@ -1,0 +1,8 @@
+CHIP isRAM {
+    IN address[15];
+    OUT out;
+
+    PARTS:
+    // Put your code here:
+	Not(in=address[14], out=out);
+}

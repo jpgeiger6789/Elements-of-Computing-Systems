@@ -1,0 +1,9 @@
+CHIP isDeviceScreen {
+    IN address[15];
+    OUT out;
+
+    PARTS:
+    // Put your code here:
+	Not(in=address[13], out=notkeyboard);
+	And(a=address[14], b=notkeyboard, out=out);
+}

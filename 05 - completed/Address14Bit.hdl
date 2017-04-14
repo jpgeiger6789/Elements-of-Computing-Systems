@@ -1,0 +1,21 @@
+CHIP Address14Bit {
+    IN address[15];
+    OUT out[14];
+
+    PARTS:
+    // Put your code here:
+	And(a=address[0], b=true, out=out[0]);
+	And(a=address[1], b=true, out=out[1]);
+	And(a=address[2], b=true, out=out[2]);
+	And(a=address[3], b=true, out=out[3]);
+	And(a=address[4], b=true, out=out[4]);
+	And(a=address[5], b=true, out=out[5]);
+	And(a=address[6], b=true, out=out[6]);
+	And(a=address[7], b=true, out=out[7]);
+	And(a=address[8], b=true, out=out[8]);
+	And(a=address[9], b=true, out=out[9]);
+	And(a=address[10], b=true, out=out[10]);
+	And(a=address[11], b=true, out=out[11]);
+	And(a=address[12], b=true, out=out[12]);
+	And(a=address[13], b=true, out=out[13]);
+}
