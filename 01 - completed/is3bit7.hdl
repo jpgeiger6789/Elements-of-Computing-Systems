@@ -1,0 +1,19 @@
+// File name: projects/01/is3bit7.hdl
+
+/**
+ * is3bit7
+ * out = 0 if sel == 000
+ *       0 if sel == 001
+ *       etc.
+ *       1 if sel == 111
+ */
+
+CHIP is3bit7 {
+    IN sel[3];
+    OUT out;
+
+    PARTS:
+    // Put your code here:
+	And(a=sel[0], b=sel[1], out=aandb);
+	And(a=aandb, b=sel[2], out=out);
+}

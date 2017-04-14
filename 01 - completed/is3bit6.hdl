@@ -1,0 +1,20 @@
+// File name: projects/01/is3bit6.hdl
+
+/**
+ * is3bit6
+ * out = 0 if sel == 000
+ *       etc.
+ *       1 if sel == 110
+ *       0 if sel == 111
+ */
+
+CHIP is3bit6 {
+    IN sel[3];
+    OUT out;
+
+    PARTS:
+    // Put your code here:
+	And(a=sel[1], b=sel[2], out=bandc);
+	Not(in=sel[0], out=nota);
+	And(a=bandc, b=nota, out=out);
+}

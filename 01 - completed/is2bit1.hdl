@@ -1,0 +1,19 @@
+// File name: projects/01/is2bit1.hdl
+
+/**
+ * is2bit1
+ * out = 0 if sel == 00
+ *       1 if sel == 01
+ *       0 if sel == 10
+ *       0 if sel == 11
+ */
+
+CHIP is2bit1 {
+    IN sel[2];
+    OUT out;
+
+    PARTS:
+    // Put your code here:
+	Not(in=sel[1], out=nota);
+	And(a=nota, b=sel[0], out=out);
+}

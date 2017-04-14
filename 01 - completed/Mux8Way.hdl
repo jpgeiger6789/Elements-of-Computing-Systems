@@ -1,0 +1,43 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/01/Mux8Way.hdl
+
+/**
+ * 8-way multiplexor:
+ * out = a if sel == 000
+ *       b if sel == 001
+ *       etc.
+ *       h if sel == 111
+ */
+
+CHIP Mux8Way {
+    IN a, b, c, d, e, f, g, h, sel[3];
+    OUT out;	
+
+    PARTS:
+    // Put your code here:
+	is3bit0(sel=sel, out=is3bit0);
+	is3bit1(sel=sel, out=is3bit1);
+	is3bit2(sel=sel, out=is3bit2);
+	is3bit3(sel=sel, out=is3bit3);
+	is3bit4(sel=sel, out=is3bit4);
+	is3bit5(sel=sel, out=is3bit5);
+	is3bit6(sel=sel, out=is3bit6);
+	is3bit7(sel=sel, out=is3bit7);
+	And(a=a, b=is3bit0, out=checka);
+	And(a=b, b=is3bit1, out=checkb);
+	And(a=c, b=is3bit2, out=checkc);
+	And(a=d, b=is3bit3, out=checkd);
+	And(a=e, b=is3bit4, out=checke);
+	And(a=f, b=is3bit5, out=checkf);
+	And(a=g, b=is3bit6, out=checkg);
+	And(a=h, b=is3bit7, out=checkh);
+	Or(a=checka, b=checkb, out=aorb);
+	Or(a=aorb, b=checkc, out=orc);
+	Or(a=orc, b=checkd, out=ord);
+	Or(a=ord, b=checke, out=ore);
+	Or(a=ore, b=checkf, out=orf);
+	Or(a=orf, b=checkg, out=org);
+	Or(a=org, b=checkh, out=out);
+}

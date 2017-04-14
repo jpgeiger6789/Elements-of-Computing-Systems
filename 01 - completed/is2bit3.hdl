@@ -1,0 +1,17 @@
+// File name: projects/01/is2bit3.hdl
+
+/**
+ * is2bit3
+ * out = 0 if sel == 00
+ *       etc.
+ *       1 if sel == 11
+ */
+
+CHIP is2bit3 {
+    IN sel[2];
+    OUT out;
+
+    PARTS:
+    // Put your code here:
+	And(a=sel[0], b=sel[1], out=out);
+}
