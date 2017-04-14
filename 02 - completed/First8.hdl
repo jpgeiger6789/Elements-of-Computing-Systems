@@ -1,0 +1,16 @@
+
+CHIP First8 {
+    IN  
+        in[16];
+	OUT out[8];
+	
+    PARTS:
+   And(a=in[0], b=true, out=out[0]);
+   And(a=in[1], b=true, out=out[1]);
+   And(a=in[2], b=true, out=out[2]);
+   And(a=in[3], b=true, out=out[3]);
+   And(a=in[4], b=true, out=out[4]);
+   And(a=in[5], b=true, out=out[5]);
+   And(a=in[6], b=true, out=out[6]);
+   And(a=in[7], b=true, out=out[7]);
+}

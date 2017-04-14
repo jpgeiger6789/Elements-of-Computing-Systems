@@ -1,0 +1,16 @@
+
+CHIP Second8 {
+    IN  
+        in[16];
+	OUT out[8];
+	
+    PARTS:
+   And(a=in[8], b=true, out=out[0]);
+   And(a=in[9], b=true, out=out[1]);
+   And(a=in[10], b=true, out=out[2]);
+   And(a=in[11], b=true, out=out[3]);
+   And(a=in[12], b=true, out=out[4]);
+   And(a=in[13], b=true, out=out[5]);
+   And(a=in[14], b=true, out=out[6]);
+   And(a=in[15], b=true, out=out[7]);
+}
