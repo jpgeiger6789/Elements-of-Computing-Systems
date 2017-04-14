@@ -1,0 +1,49 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/03/a/RAM64.hdl
+
+/**
+ * Memory of 64 registers, each 16 bit-wide. Out holds the value
+ * stored at the memory location specified by address. If load==1, then 
+ * the in value is loaded into the memory location specified by address 
+ * (the loaded value will be emitted to out from the next time step onward).
+ */
+
+CHIP RAM64 {
+    IN in[16], load, address[6];
+    OUT out[16];
+	
+    PARTS:
+    // Put your code here:
+	First3(in=address, out=first3);
+	Second3(in=address, out=second3);
+	
+	is3bit0(sel=first3, out=is3bit0);
+	is3bit1(sel=first3, out=is3bit1);
+	is3bit2(sel=first3, out=is3bit2);
+	is3bit3(sel=first3, out=is3bit3);
+	is3bit4(sel=first3, out=is3bit4);
+	is3bit5(sel=first3, out=is3bit5);
+	is3bit6(sel=first3, out=is3bit6);
+	is3bit7(sel=first3, out=is3bit7);
+	
+	And(a=is3bit0, b=load, out=load0);
+	RAM8(in=in, load=load0, address=second3, out=out0);
+	And(a=is3bit1, b=load, out=load1);
+	RAM8(in=in, load=load1, address=second3, out=out1);
+	And(a=is3bit2, b=load, out=load2);
+	RAM8(in=in, load=load2, address=second3, out=out2);
+	And(a=is3bit3, b=load, out=load3);
+	RAM8(in=in, load=load3, address=second3, out=out3);
+	And(a=is3bit4, b=load, out=load4);
+	RAM8(in=in, load=load4, address=second3, out=out4);
+	And(a=is3bit5, b=load, out=load5);
+	RAM8(in=in, load=load5, address=second3, out=out5);
+	And(a=is3bit6, b=load, out=load6);
+	RAM8(in=in, load=load6, address=second3, out=out6);
+	And(a=is3bit7, b=load, out=load7);
+	RAM8(in=in, load=load7, address=second3, out=out7);
+	
+	Mux8Way16(a=out0, b=out1, c=out2, d=out3, e=out4, f=out5, g=out6, h=out7, sel=first3, out=out);
+}
