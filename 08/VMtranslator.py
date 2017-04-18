@@ -19,14 +19,14 @@ class tokens():
 
         self.comment = r"(?P<comment>//.*$)"
 
-        self.label = r"(?P<label>[a-zA-Z_.$:][\w_.$:]*)"
-        self.flowType = r"(?P<flowType>(label)|(goto)|(" + re.escape(r"if-goto") + "))"
+        self.label = r"(?P<label>[a-zA-Z_.:][\w_.:]*)"
+        self.flowType = r"(?P<flowType>(label)|(goto)|(" + re.escape(r"if-goto") + r"))"
         self.labelFlow = r"(?P<labelFlow>" + self.flowType + tokens.space + self.label + r")"
 
         self.CallFunction = r"(?P<CallFunction>(call)|(function))"
         self.function = r"(?P<function>[a-zA-Z_.:][\w_.:]*)"
         self.funcNum = r"(?P<funcNum>(\d+))"
-        self.funcFlow = r"(?P<funcFlow>" + self.CallFunction + tokens.space + self.function + tokens.space + self.funcNum + ")"
+        self.funcFlow = r"(?P<funcFlow>" + self.CallFunction + tokens.space + self.function + tokens.space + self.funcNum + r")"
 
         self.funcReturn = r"(?P<funcReturn>return)"
 
