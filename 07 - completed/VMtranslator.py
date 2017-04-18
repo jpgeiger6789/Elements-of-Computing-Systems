@@ -13,14 +13,13 @@ class tokens():
         self.segmentNum = r"(?P<segmentNum>(\d+))"
         self.pushpop = r"(?P<pushpop>" + self.memory + tokens.space + self.segment + tokens.space + self.segmentNum + r")"
         self.constant = r"(push" + tokens.space + r"constant" + tokens.space + r"(?P<constant>(\d+)))"
-        self.memoryaccess = r"(?P<memoryaccess>" +  self.pushpop + r"|" + self.constant + r")"
+        self.memoryaccess = r"(?P<memoryaccess>" + self.pushpop + r"|" + self.constant + r")"
 
         self.arithmetic = r"(?P<arithmetic>(add)|(sub)|(neg)|(eq)|(gt)|(lt)|(and)|(or)|(not))"
 
         self.comment = r"(?P<comment>//.*$)"
 
         self.label = r"(label" + tokens.space + r"(?P<label>[a-zA-Z]+))"
-
         self.goto = r"(goto" + tokens.space +  r"(?P<goto>[a-zA-Z]+))"
         self.ifgoto = r"(" + re.escape(r"if-goto") + tokens.space + r"(?P<ifgoto>[a-zA-Z]+))"
         self.goflow = r"(?P<goflow>" + self.goto + r"|" + self.ifgoto  + r")"

@@ -1,14 +1,12 @@
-# https://docs.python.org/3/howto/argparse.html
+#https://docs.python.org/3/howto/argparse.html
 
 import sys
 import re
 import os
 
-
 class tokens():
-    # define regular expression patterns
+    #define regular expression patterns
     space = r"[ \t]+"
-
     def __init__(self):
         self.memory = r"(?P<memory>(push)|(pop))"
         self.segment = r"(?P<segment>(argument)|(local)|(static)|(this)|(that)|(pointer)|(temp))"
