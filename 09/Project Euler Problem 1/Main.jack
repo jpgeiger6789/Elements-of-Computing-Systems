@@ -1,0 +1,58 @@
+/*
+If we list all the natural numbers below 10 that are multiples of 3 or 5, we get 3, 5, 6 and 9. The sum of these multiples is 23.
+
+Find the sum of all the multiples of 3 or 5 below 1000.
+ */
+class Main {
+   function void main() {
+      var int sum;
+
+      var Array a; //since our max value is 32768, we gotta save our answer in an array.  The max answer is
+      //500,500 (this is every number summed between 1 and 1000), so we need an array of length 16
+      //(31768 is the min value that can be stored, 500,500/31768 = 15.something)
+      var int arrayIndex;
+      var int i;
+
+      let a = Array.new(16); // constructs the array
+      let arrayIndex = 0;
+
+      let sum = 0;
+
+      let i = 3;
+      while (i < 1000) {
+         if (Main.mod(i, 3) = 0) {
+           let sum = sum + i;
+         } else {
+           if (Main.mod(i, 5) = 0) {
+             let sum = sum + i;
+           }
+         }
+         if (sum > 31768) {
+           //getting too close to the max integer value
+           let a[arrayIndex] = sum;
+           let arrayIndex = arrayIndex + 1;
+           let sum = 0;
+         }
+         let i = i + 1;
+      }
+
+      do Output.printString("The sum is ");
+      do Output.printInt(sum);
+      let arrayIndex = 0;
+      while (arrayIndex < 16) {
+        do Output.printString(" plus ");
+        do Output.printInt(a[arrayIndex]);
+        let arrayIndex = arrayIndex + 1;
+      }
+      return;
+   }
+
+   function int mod(int x, int y) {
+     var int ans;
+     let ans = x;
+     while ((ans > y) | (ans = y)) {
+       let ans = (ans - y);
+     }
+     return ans;
+   }
+}
