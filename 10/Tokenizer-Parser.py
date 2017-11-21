@@ -15,7 +15,7 @@ class tokens():
         the symbol regular expression matches the following symbols:
         { } ( ) [ ] . , ; + - * / & | < > = ~
         """
-        self.symbol = (r"(?P<symbol>" + "|".join(map(re.escape, r"{}()[].,;+-*/&|<>=~")) + ")")
+        self.symbol = (r"(?P<symbol>" + "|".join(map(re.escape, r"{}()[].,;+-*/&|<>=~")) + "(?=\s|$))")
 
         """
         the integerConstant regular expression matches any number in the range 0..32767.  I have allowed any number
@@ -38,7 +38,7 @@ class tokens():
         self.identifier = r"(?P<identifier>[a-zA-Z_][\w_]*(?=\s|$))"
 
         self.LexicalElement = r"(?P<LexicalElement>" + r"|".join([self.keyword, self.symbol, self.integerConstant, self.StringConstant, self.identifier]) + r")"
-        self.line = r"(?P<line>^\s*[(" + self.LexicalElement + ")\s*]*$)"
+        self.line = r"^(?P<line>\s*(" + self.LexicalElement + "\s*)*)$"
 
 if __debug__:
     d = tokens()
@@ -49,14 +49,17 @@ if __debug__:
         "|int|char|boolean|void|true|false|null|this|let|do|if|else|while|return").split("|")
     for i in keywords:
         assert re.match(d.keyword, i)
+        assert re.match(d.LexicalElement, i)
 
     #check symbols
     for i in r"{}()[].,;+-*/&|<>=~":
         assert re.match(d.symbol, i)
+        assert re.match(d.LexicalElement, i)
 
     #check integer constants
     for i in "0|01|10|0123|123|01234|1234|12345|22345|31345|32345|32745|32765|032765|32767".split("|"):
         assert re.match(d.integerConstant, i)
+        assert re.match(d.LexicalElement, i)
     for i in r"-1|32768|32771|32811|33111|40000|032768|032771|032811|033111|040000|3.4|3.0".split("|"):
         assert not re.match(d.integerConstant, i)
 
@@ -64,17 +67,15 @@ if __debug__:
     import itertools #need to chain two rainges together
     for i in itertools.chain(range(10), range(11, 32768)): #ignore newline character - Jack language doesn't support it
         assert re.match(d.StringConstant, '"' + re.escape(chr(i)) + '"')
+        assert re.match(d.LexicalElement, '"' + re.escape(chr(i)) + '"')
     assert re.match(d.StringConstant, '""')
+    assert re.match(d.LexicalElement, '""')
     assert not re.match(d.StringConstant, 'abc')
     assert  not re.match(d.StringConstant, '')
 
     #check lines
     for i in [r'  class foo 12345', r'(', r'"howdy" if 00000012 let "let" ; ( ) ']:
-        try:
-            assert re.match(d.line, i)
-        except:
-            print(i)
-
+        assert re.match(d.line, i)
 
 class parser():
     def __init__(self, fname):
