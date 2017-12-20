@@ -305,6 +305,7 @@ class Parser():
 
             variableDict[name] = Variable(name, type, kind, num[0]) #record the variable name to be passed back to the caller
             num[0] += 1
+            raise Exception("VM translation not implemented")
 
             self.nextToken = next(self.tokenIterable)
             if self.nextToken[1][1] not in [",", ";"]:
