@@ -10,7 +10,7 @@ push constant 17
 eq
 push constant 17
 push constant 16
-eq
+eq //outputs false
 push constant 16
 push constant 17
 eq

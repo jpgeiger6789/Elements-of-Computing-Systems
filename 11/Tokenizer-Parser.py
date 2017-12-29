@@ -200,7 +200,7 @@ class ParseException(Exception):
         baseStr =  Exception.__str__(self)
         if self.tokenList:
             #tokens = "\n".join(str(i[1]) for i in self.tokenList[:self.token[0] + 1])
-            tokens = "\n".join(str(i[1]) for i in self.tokenList)
+            tokens = "\n".join(f"{i}: {tkn[1]}" for i, tkn in enumerate(self.tokenList))
         else:
             tokens = "no tokens found"
         if not self.token:
@@ -226,9 +226,27 @@ class Variable():
         self.kind = kind
         self.num = num
     def pushVMcode(self):
-        return f"push {self.kind} {self.num}"
+        if self.kind == "field": #have to get access to self object (should be parameter 1 in calling function)
+            return f"push argument 0\npop pointer 1\npush that {self.num}\n"
+        else:
+            return f"push {self.kind} {self.num}\n"
     def popVMcode(self):
-        return f"pop {self.kind} {self.num}"
+        if self.kind == "field": #have to get access to self object (should be parameter 1 in calling function)
+            return f"push argument 0\npop pointer 1\npop that {self.num}\n"
+        else:
+            return f"pop {self.kind} {self.num}\n"
+
+"""
+class to be used in the function lookup dictionary
+"""
+class Function():
+    def __init__(self, className, funcName, returnType):
+        self.lookupName = f"{className}.{funcName}"
+        self.returnType = returnType
+        if self.returnType == "void":
+            self.appendText = "pop temp 0\n"
+        else:
+            self.appendText = ""
 
 class Parser():
     opDict = {"+": "add",
@@ -241,6 +259,9 @@ class Parser():
               ">": "gt",
               "=": "eq"}
 
+    #need these to make sure we don't add the "pop temp 0" after calls to functions in the OS
+    OSclasses = ["Array", "Keyboard", "Math", "Memory", "Output", "Screen", "String", "Sys"]
+
     """
     In each parse subroutine, we will assume the next element has already been selected and verified for the subroutine
     """
@@ -251,6 +272,7 @@ class Parser():
         self.ClassName = ""
         self.nextToken = [None, None] #tokenIndex, token, where token is of the form [tokenType, tokenValue]
         self.ifNum = 0
+        self.functionList = []
 
     """
     the parser uses a global integer ifNum to keep all if statements unique.  Rather than worry about if statements on a function-based level, we do them on a class-based
@@ -266,7 +288,7 @@ class Parser():
         self.nextToken = next(self.tokenIterable)
         if self.nextToken[1][1] != "class":
             raise ParseException("Parse error: the first token must be the keyword 'class'", self.nextToken, self.tokenList, self.tokenizer.iname)
-        return self.compileClass()
+        return (self.compileClass(), self.functionList)
 
     def compileClass(self):
         self.nextToken = next(self.tokenIterable)
@@ -275,6 +297,7 @@ class Parser():
             raise ParseException("compileClass error: the second token in a class must be an identifier", self.nextToken, self.tokenList, self.tokenizer.iname)
         
         self.ClassName = self.nextToken[1][1]
+        VMcode = f"//class '{self.ClassName}' declaration start.  compiling variable declarations.\n"
         
         self.nextToken = next(self.tokenIterable)
         if self.nextToken[1][1] != "{":
@@ -283,13 +306,13 @@ class Parser():
         self.nextToken = next(self.tokenIterable)
 
         variableDict = dict() #name:Variable Class lookup
-        num = [0]
+        classNums = {"static": [0], "field": [0]}
         while (self.nextToken[1][1] in ["static", "field"]):
-            self.compileVariabledeclaration(num, variableDict) #must call next element before exiting
-        VMcode = ""
+            VMcode += self.compileVariabledeclaration(classNums[self.nextToken[1][1]], variableDict) #must call next element before exiting
+        VMcode += "//done compiling variable declarations.  compiling class functions.\n"
         while self.nextToken[1][1] in ["constructor", "function", "method"]:
-            #we're going to copy variableDict so it isn't modified by the compileFunction subroutine so we create a new dictionary
-            VMcode += self.compileFunction(dict(variableDict)) #must call next element before exiting
+            #we're going to copy variableDict so it isn't modified by the compileSubroutine subroutine so we create a new dictionary
+            VMcode += self.compileSubroutine(dict(variableDict)) #must call next element before exiting
 
         if self.nextToken[1][1] != "}":
                 raise ParseException("compileClass error: the final token in a class must be a closing bracket.", self.nextToken, self.tokenList, self.tokenizer.iname)
@@ -298,15 +321,18 @@ class Parser():
             self.nextToken = next(self.tokenIterable)
             raise ParseException("compileClass error: the class must end with the closing bracket after all subroutine declarations.", self.nextToken, self.tokenList, self.tokenizer.iname)
         except StopIteration:
-            return VMcode
+            return VMcode + "//done compiling functions. class declaration end"
 
     """
-    this function produces no VM code but modifies the variable dictionary so that when the variables are later called, the VM code can be properly
+    this function produces only commented VM code indicating the variable number to variable name lookup 
+    from a functional standpoint it modifies the variable dictionary so that when the variables are later called, the VM code can be properly
     produced
     pass num as a list so it is a mutable object
     """
     def compileVariabledeclaration(self, num, variableDict):
+        VMcode = ""
         kind = self.nextToken[1][1]
+        if kind == "var": kind = "local" #all var statements set a local parameter
         self.nextToken = next(self.tokenIterable)
 
         if not (self.nextToken[1][0] == "identifier" or self.nextToken[1][1] in ["int", "char", "boolean"]):
@@ -316,15 +342,14 @@ class Parser():
         self.nextToken = next(self.tokenIterable)
 
         commaFound = True #this should really be false but we need it to be True to make the loop execute at least once
-
         while commaFound:
             if self.nextToken[1][0] != "identifier":
                 raise ParseException("compileVariabledeclaration error: expected an identifier", self.nextToken, self.tokenList, self.tokenizer.iname)
             name = self.nextToken[1][1]
 
             variableDict[name] = Variable(name, type, kind, num[0]) #record the variable name to be passed back to the caller
+            VMcode += f"//{num[0]}: [name: '{name}'; type: '{type}'; kind: '{kind}']\n"
             num[0] += 1
-            #no VM code is produced until the variables are initialized
 
             self.nextToken = next(self.tokenIterable)
             if self.nextToken[1][1] not in [",", ";"]:
@@ -332,52 +357,58 @@ class Parser():
             commaFound = (self.nextToken[1][1] == ",") #keep looping until a semicolon is found
 
             self.nextToken = next(self.tokenIterable)
+        return VMcode
 
-    """
-    variableSet must be a set containing all the class variables so that the function can know what variables are in its scope
-    """
-    def compileFunction(self, variableDict):
-        VMcode = ""
+    def compileSubroutine(self, variableDict):
         funcKind = self.nextToken[1][1] #"constructor", "function", "method"
 
         self.nextToken = next(self.tokenIterable)
         if not (self.nextToken[1][0] == "identifier" or self.nextToken[1][1] in ["void", "int", "char", "boolean"]):
-            raise ParseException("compileFunction error: the token after a function declaration must be 'void' or a type declaration", self.nextToken, self.tokenList, self.tokenizer.iname)
+            raise ParseException("compileSubroutine error: the token after a function declaration must be 'void' or a type declaration", self.nextToken, self.tokenList, self.tokenizer.iname)
 
         funcType = self.nextToken[1][1]
 
         self.nextToken = next(self.tokenIterable)
         if self.nextToken[1][0] != "identifier":
-            raise ParseException("compileFunction error: the token after a function type declaration must be an identifier", self.nextToken, self.tokenList, self.tokenizer.iname)
+            raise ParseException("compileSubroutine error: the token after a function type declaration must be an identifier", self.nextToken, self.tokenList, self.tokenizer.iname)
         funcName = self.nextToken[1][1]
+
+        self.functionList.append(Function(self.ClassName, funcName, funcType))
 
         self.nextToken = next(self.tokenIterable)
         if self.nextToken[1][1]  != "(":
-            raise ParseException("compileFunction error: the token after the subroutine name must be an opening parenthesis", self.nextToken, self.tokenList, self.tokenizer.iname)
+            raise ParseException("compileSubroutine error: the token after the subroutine name must be an opening parenthesis", self.nextToken, self.tokenList, self.tokenizer.iname)
 
         self.nextToken = next(self.tokenIterable)
-
         num = [0]
-        self.compileParameterList(num, variableDict) #must call next element before exiting
+        paramComments = self.compileParameterList(num, variableDict) #must call next element before exiting
         if funcKind == "method": #class methods get the class passed as the first argument so we must pass an extra argument
             num[0] += 1
-        VMcode += f"function {self.ClassName}.{funcName} {num[0]}" #using string interpolation
         if self.nextToken[1][1] != ")":
-            raise ParseException("compileFunction error: the token after the expression list must be a closing parenthesis", self.nextToken, self.tokenList, self.tokenizer.iname)
-
+            raise ParseException("compileSubroutine error: the token after the expression list must be a closing parenthesis", self.nextToken, self.tokenList, self.tokenizer.iname)
         self.nextToken = next(self.tokenIterable)
 
         if self.nextToken[1][1] != "{":
-            raise ParseException("compileFunction error: the token after a function name must be a forward bracket '{'", self.nextToken, self.tokenList, self.tokenizer.iname)
+            raise ParseException("compileSubroutine error: the token after a function name must be a forward bracket '{'", self.nextToken, self.tokenList, self.tokenizer.iname)
+        numLocals = [0]
+        subroutineBody = self.compileSubroutineBody(variableDict, numLocals) #must call next element before exiting
+        VMcode = f"function {self.ClassName}.{funcName} {numLocals[0]}\n"
+        VMcode += f"//compile subroutine '{funcName}' start. compiling parameter list.\n{paramComments}"
+        VMcode += f"//done compiling parameter list.  compiling subroutine body.\n{subroutineBody}"
+        return VMcode + "//done compiling subroutine body. compile subroutine end\n"
 
-        VMcode += self.compileSubroutineBody(variableDict) #must call next element before exiting
-        return VMcode
-
+    """
+    this function produces only commented VM code indicating the variable number to variable name lookup 
+    from a functional standpoint it modifies the variable dictionary so that when the variables are later called, the VM code can be properly
+    produced
+    pass num as a list so it is a mutable object
+    """
     def compileParameterList(self, num, variableDict):
+        VMcode = ""
         if not (self.nextToken[1][0] == "identifier" or self.nextToken[1][1] in ["int", "char", "boolean", ")"]):
             raise ParseException("compileParameterList error: invalid token found.  Expected type declaration or closing parenthesis", self.nextToken, self.tokenList, self.tokenizer.iname)
         continueBool = (self.nextToken[1][1] != ")") #could be an empty parameterlist
-
+        if not continueBool: VMcode = "//no parameters\n"
         while continueBool:
             if not (self.nextToken[1][0] == "identifier" or self.nextToken[1][1] in ["int", "char", "boolean"]):
                 raise ParseException("compileParameterList error: invalid token found.  Expected type declaration", self.nextToken, self.tokenList, self.tokenizer.iname)
@@ -389,6 +420,7 @@ class Parser():
                 raise ParseException("compileParameterList error: each variable name must be an identifier", self.nextToken, self.tokenList, self.tokenizer.iname)
             name = self.nextToken[1][1]
             variableDict[name] = Variable(name, type, "argument", num[0])
+            VMcode += f"//{num[0]}: [name: '{name}'; type: '{type}'; kind: 'argument']\n"
             num[0] += 1
             self.nextToken = next(self.tokenIterable)
             if not (self.nextToken[1][1] in [",", ")"]):
@@ -396,19 +428,16 @@ class Parser():
             continueBool = self.nextToken[1][1] == ","
             if continueBool: #if continue, you must first process the next token
                 self.nextToken = next(self.tokenIterable)
+        return VMcode
 
-    """
-    variableDict must be a dictionary containing all the class variables so that the function can know what variables are in its scope
-    """
-    def compileSubroutineBody(self, variableDict):
-
+    def compileSubroutineBody(self, variableDict, numLocals):
+        VMcode = "//compiling variable declarations\n"
         self.nextToken = next(self.tokenIterable)
 
-        num = [0]
         while self.nextToken[1][1] == "var":
-            self.compileVariabledeclaration(num, variableDict) #must call next element before exiting
+            VMcode += self.compileVariabledeclaration(numLocals, variableDict) #must call next element before exiting
 
-        VMcode = self.compileStatements(variableDict) #must call next element before exiting
+        VMcode += "//done compiling variable declarations. compiling subroutine statements.\n" + self.compileStatements(variableDict) #must call next element before exiting
 
         if self.nextToken[1][1] != "}":
                 raise ParseException("compileSubroutineBody error: the final token in a function must be a closing bracket.", self.nextToken, self.tokenList, self.tokenizer.iname)
@@ -417,21 +446,38 @@ class Parser():
         return VMcode
 
     """
-    variableSet must be a set containing all the class variables so that the statements can know what variables are in their scope
+    We do a bit of extra work to add useful comments to the VM code in this subroutine. It's a bit wonky since we don't 
+    know where the spacing was in the original .jack code, but it still produces a readable result.
     """
     def compileStatements(self, variableDict):
         VMcode = ""
         while self.nextToken[1][1] in ["let", "if", "while", "do", "return"]:
+            tokenNum = self.nextToken[0]
             if self.nextToken[1][1] == "let":
-                VMcode += self.compileLetStatement(variableDict) #must call next element before exiting
+                statementVMcode = self.compileLetStatement(variableDict) #must call next element before exiting
+                finalTokenNum = self.nextToken[0]
+                statementJackCode = " ".join([i[1] for i in self.tokenList[tokenNum: finalTokenNum]]) + "\n"
+                VMcode += f"//statement start: {statementJackCode}{statementVMcode}//statement end: {statementJackCode}"
             elif self.nextToken[1][1] == "if":
-                VMcode += self.compileIfStatement(variableDict) #must call next element before exiting
+                statementVMcode = self.compileIfStatement(variableDict) #must call next element before exiting
+                finalTokenNum = self.nextToken[0]
+                statementJackCode = " ".join([i[1] for i in self.tokenList[tokenNum: finalTokenNum]]) + "\n"
+                VMcode += f"//statement start: {statementJackCode}{statementVMcode}//statement end: {statementJackCode}"
             elif self.nextToken[1][1] == "while":
-                VMcode += self.compileWhileStatement(variableDict) #must call next element before exiting
+                statementVMcode = self.compileWhileStatement(variableDict) #must call next element before exiting
+                finalTokenNum = self.nextToken[0]
+                statementJackCode = " ".join([i[1] for i in self.tokenList[tokenNum: finalTokenNum]]) + "\n"
+                VMcode += f"//statement start: {statementJackCode}{statementVMcode}//statement end: {statementJackCode}"
             elif self.nextToken[1][1] == "do":
-                VMcode += self.compileDoStatement(variableDict) #must call next element before exiting
+                statementVMcode = self.compileDoStatement(variableDict) #must call next element before exiting
+                finalTokenNum = self.nextToken[0]
+                statementJackCode = " ".join([i[1] for i in self.tokenList[tokenNum: finalTokenNum]]) + "\n"
+                VMcode += f"//statement start: {statementJackCode}{statementVMcode}//statement end: {statementJackCode}"
             elif self.nextToken[1][1] == "return":
-                VMcode += self.compileReturnStatement(variableDict) #must call next element before exiting
+                statementVMcode = self.compileReturnStatement(variableDict) #must call next element before exiting
+                finalTokenNum = self.nextToken[0]
+                statementJackCode = " ".join([i[1] for i in self.tokenList[tokenNum: finalTokenNum]]) + "\n"
+                VMcode += f"//statement start: {statementJackCode}{statementVMcode}//statement end: {statementJackCode}"
         return VMcode
 
     def compileLetStatement(self, variableDict):
@@ -471,10 +517,13 @@ class Parser():
 
         self.nextToken = next(self.tokenIterable)
 
+        #I'm worried I didn't implement this correctly.  A potential source of errors.
         if indexExpressionVMcode:
-            return f"{expressionVMcode}\n{indexExpressionVMcode}\n{var.pushVMcode()}\nadd\npop pointer 1\npop that"
+            pvmCode = var.pushVMcode()
+            return f"{expressionVMcode}{indexExpressionVMcode}{pvmCode}add\npop pointer 1\npop that 0\n"
         else:
-            return f"{expressionVMcode}\n{var.popVMcode()}"
+            pvmCode = var.popVMcode()
+            return f"{expressionVMcode}{pvmCode}"
 
     def compileIfStatement(self, variableDict):
         ifNum = self.getIfNum() #use this to keep the labels unique
@@ -520,9 +569,9 @@ class Parser():
 
             self.nextToken = next(self.tokenIterable)
             return f"{boolVMcode}if-goto IF{ifNum}\ngoto ELSEIF{ifNum}\n" \
-                   f"label IF{ifNum}\n{conditionalStatementsVMcode}\ngoto ENDIF\nlabel ELSEIF{ifNum}\n{elseStatementsVMcode}\nlabel ENDIF{ifNum}"
+                   f"label IF{ifNum}\n{conditionalStatementsVMcode}\ngoto ENDIF{ifNum}\nlabel ELSEIF{ifNum}\n{elseStatementsVMcode}\nlabel ENDIF{ifNum}\n"
         else:
-            return f"{boolVMcode}if-goto IF{ifNum}\ngoto ENDIF{ifNum}\nlabel IF{ifNum}\n{conditionalStatementsVMcode}\nlabel ENDIF{ifNum}"
+            return f"{boolVMcode}if-goto IF{ifNum}\ngoto ENDIF{ifNum}\nlabel IF{ifNum}\n{conditionalStatementsVMcode}\nlabel ENDIF{ifNum}\n"
 
     def compileWhileStatement(self, variableDict):
         ifNum = self.getIfNum() #use this to keep the labels unique
@@ -556,7 +605,7 @@ class Parser():
 
         self.nextToken = next(self.tokenIterable)
 
-        return f"label WHILESTART{ifNum}\n{boolVMcode}if-goto WHILE{ifNum}\ngoto ENDWHILE{ifNum}\nlabel WHILE{ifNum}\n{conditionalStatementsVMcode}\ngoto WHILESTART{ifNum}\nlabel ENDWHILE{ifNum}"
+        return f"label WHILESTART{ifNum}\n{boolVMcode}if-goto WHILE{ifNum}\ngoto ENDWHILE{ifNum}\nlabel WHILE{ifNum}\n{conditionalStatementsVMcode}\ngoto WHILESTART{ifNum}\nlabel ENDWHILE{ifNum}\n"
 
     def compileDoStatement(self, variableDict):
         self.nextToken = next(self.tokenIterable)
@@ -573,15 +622,15 @@ class Parser():
         self.nextToken = next(self.tokenIterable)
 
         if self.nextToken[1][1] != ";":
-            returnVMcode = self.compileExpression(variableDict)  # must call next element before exiting
+            returnValueVMcode = self.compileExpression(variableDict)  # must call next element before exiting
         else:
-            returnVMcode = "push constant 0"
+            returnValueVMcode = "push constant 0\n"
 
         if self.nextToken[1][1] != ";":
             raise ParseException("compileReturnStatement error: a return statement must end in a semicolon", self.nextToken, self.tokenList, self.tokenizer.iname)
 
         self.nextToken = next(self.tokenIterable)
-        return returnVMcode
+        return f"{returnValueVMcode}return\n"
 
     def compileExpression(self, variableDict):
         termStr = self.compileTerm(variableDict)  #must call next element before exiting
@@ -589,12 +638,11 @@ class Parser():
         expressionStr = termStr
 
         while self.nextToken[1][1] in ["+", "-", "*", "/", "&", "|", "<", ">", "="]:
-            opStr = Parser.opDict[self.nextToken[1][1]]
-            expressionStr += f"\n{opStr}\n"
+            opStr = f"{Parser.opDict[self.nextToken[1][1]]}\n"
 
             self.nextToken = next(self.tokenIterable)
 
-            expressionStr = self.compileTerm(variableDict) + expressionStr  #must call next element before exiting
+            expressionStr = expressionStr + self.compileTerm(variableDict) + opStr #must call next element before exiting
 
         return expressionStr
 
@@ -612,7 +660,7 @@ class Parser():
         #first handle the terms that are a single token
         if tokenType == "integerConstant":
             self.nextToken = next(self.tokenIterable) #need to call nextToken before returning
-            return f"push constant {tokenValue}"
+            return f"push constant {tokenValue}\n"
         elif tokenType == "stringConstant":
             self.nextToken = next(self.tokenIterable) #need to call nextToken before returning
             return Parser.parseString(tokenValue)
@@ -638,7 +686,8 @@ class Parser():
                 #must have been a variable name
                 var = variableDict[tokenValue]
 
-                return f"{var.pushVMcode}\n"
+                pvmCode = var.pushVMcode()
+                return f"{pvmCode}"
                 #we don't iterate the tokenIterable, since we already did that before
                 #self.nextToken = next(self.tokenIterable)  <<not required
             elif self.nextToken[1][1] == "[":
@@ -649,7 +698,8 @@ class Parser():
                 #First push the variable on the stack (assume it points to an object in memory), then add the result of the expression to it
                 var = variableDict[tokenValue]
 
-                VMcode = f"{var.pushVMcode}\n"
+                pvmCode = var.pushVMcode()
+                VMcode = f"{pvmCode}"
 
                 #got the variable and the opening bracket, now process the enclosed expression
                 self.nextToken = next(self.tokenIterable)
@@ -697,6 +747,7 @@ class Parser():
         if self.nextToken[1][1] not in ["(", "."]:
             raise ParseException("compileSubroutineCall error: the token after the first identifier in a subroutine call must be an opening parenthesis or a period", self.nextToken, self.tokenList, self.tokenizer.iname)
 
+        num = [0] #initialize a list to pass to the function to get the number of variables
         varDec = "" #empty unless the 'self' variable is pushed as the implicit first argument
         if self.nextToken[1][1] == ".":
             #could be a call to a variable assigned to a class, or to a class itself.  need to distinguish between the two.
@@ -704,7 +755,9 @@ class Parser():
             if previousIdentifier in variableDict:
                 var = variableDict[previousIdentifier]
                 className = var.type
-                varDec = f"push {previousIdentifier}\n" #need to pass class instance
+                pvmcode = var.pushVMcode()
+                varDec = f"{pvmcode}\n" #need to pass class instance
+                num[0] += 1
             else:
                 className = previousIdentifier
 
@@ -712,70 +765,86 @@ class Parser():
             if self.nextToken[1][0] != "identifier":
                 raise ParseException("compileSubroutineCall error: the token after the period in a class-subroutine call must be an identifier indicating a subroutine name", self.nextToken, self.tokenList, self.tokenizer.iname)
             funcName = self.nextToken[1][1]
+            self.nextToken = next(self.tokenIterable)
         else:
             className = self.ClassName
-            funcName = self.nextToken[1][1]
-
-        funcCall = f"goto {className}.{funcName}\n"
+            funcName = previousIdentifier
 
         if self.nextToken[1][1]  != "(":
             raise ParseException("compileSubroutineCall error: the token after the subroutine name must be an opening parenthesis", self.nextToken, self.tokenList, self.tokenizer.iname)
 
         self.nextToken = next(self.tokenIterable)
 
-        varDec += self.compileExpressionList(variableDict)  #must call next element before exiting
-
+        varDec += self.compileExpressionList(variableDict, num)  #must call next element before exiting
+        if not className in Parser.OSclasses:
+            funcCall = f"call {className}.{funcName} {num[0]}\n{{{className}.{funcName}}}"
+        else:
+            funcCall = f"call {className}.{funcName} {num[0]}\n"
         if self.nextToken[1][1] != ")":
             raise ParseException("compileSubroutineCall error: the token after the expression list must be a closing parenthesis", self.nextToken, self.tokenList, self.tokenizer.iname)
         self.nextToken = next(self.tokenIterable)
         return varDec + funcCall
 
-    def compileExpressionList(self, variableDict):
+    """
+    pas num as a list initialized to 0 to be passed back to the caller
+    alternatively, if this is a class instance call, num will be initialized to 1
+    """
+    def compileExpressionList(self, variableDict, num):
         if self.nextToken[1][1] == ")":
-            return
+            return ""
         output = self.compileExpression(variableDict)  #must call next element before exiting
+        num[0] += 1
         while self.nextToken[1][1] == ",":
             self.nextToken = next(self.tokenIterable)
             output += self.compileExpression(variableDict)  #must call next element before exiting
+            num[0] += 1
         return output
 
     @staticmethod
     def parseString(str):
-        vmStr = f"String.new({len(str)})"
+        vmStr = f"//parse string '{str}'\n"
+        vmStr += f"push constant {len(str)}\ncall String.new 1\n"
         for i in str:
-            vmStr += f"\nString.appendChar({i})"
-        return vmStr
+            intVal = ord(i)
+            vmStr += f"push constant {intVal} //apppend '{i}' to the string (ASCII #{intVal})\ncall String.appendChar 2\n" #string.appendchar needs to have a reference to the string object being modified
+        return vmStr + f"//done parsing string '{str}'\n"
 
-def createVMfile(fileName):
-    extens = os.path.basename(fileName).rsplit(".", 1)[1]
-    oname = fileName[:-len(extens)-1] + "Parsed.vm"
+def ParseFolder(folderName):
+    vmDocs = dict()
+    funcLists = []
+    for fileName in os.listdir(folderName):
+        fullName = os.path.join(folderName, fileName)
+        if os.path.isfile(fullName):
+            extens = os.path.basename(fileName).rsplit(".", 1)[1]
+            if extens == "jack":
+                t = tokenizer(fullName)
+                p = Parser(t)
+                vmInfo = p.Parse()
+                vmDocs[fileName] = vmInfo[0]
+                funcLists.append(vmInfo[1])
 
-    if os.path.isfile(oname):
-        os.remove(oname)
+    funcDict = dict()
+    for funcList in funcLists:
+        for func in funcList:
+            funcDict[func.lookupName] = func.appendText
+    for fileName in vmDocs:
+        vmText = vmDocs[fileName]
+        vmText = vmText.format(**funcDict)
+        extens = os.path.basename(fileName).rsplit(".", 1)[1]
+        oname = f"{fileName[:-len(extens)-1]}.vm"
 
-    t = tokenizer(fileName)
-    p = Parser(t)
-
-    outText = p.Parse()
-    with open(oname, "w") as ofile:
-        ofile.write(outText)
+        if os.path.isfile(oname):
+            os.remove(oname)
+        with open(oname, "w") as ofile:
+            ofile.write(vmText)
 
 def main():
     if len(sys.argv) > 1:
         fname = sys.argv[1]
     else: #for debugging
-        fname = os.path.dirname(os.path.realpath(__file__)) + r"\Average"
+        fname = os.path.dirname(os.path.realpath(__file__)) + r"\Pong"
 
-    if os.path.isdir(fname):
-        for fileName in os.listdir(fname):
-            fullName = os.path.join(fname, fileName)
-            if os.path.isfile(fullName):
-                extens = os.path.basename(fileName).rsplit(".", 1)[1]
-                if extens == "jack":
-                    createVMfile(fullName)
-
-    else:
-        createVMfile(fname)
+    ParseFolder(fname)
 
 if __name__ == '__main__':
     main()
