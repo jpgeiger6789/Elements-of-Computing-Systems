@@ -928,9 +928,10 @@ def ParseFolder(folderName):
     for fileName in vmDocs:
         vmText = vmDocs[fileName]
 
-        vmText = regex.sub("//.*?\n", "\n", vmText)
-        vmText = regex.sub("\n( *\n)*", "\n", vmText)
-        vmText = regex.sub("( +\n)+", "\n", vmText)
+        #uncomment these to directly compare generated VM code to VM generated from JackCompiler.bat tool
+        #vmText = regex.sub("//.*?\n", "\n", vmText)
+        #vmText = regex.sub("\n( *\n)*", "\n", vmText)
+        #vmText = regex.sub("( +\n)+", "\n", vmText)
 
         extens = os.path.basename(fileName).rsplit(".", 1)[1]
         oname = os.path.join(folderName, f"{fileName[:-len(extens)-1]}.vm")
